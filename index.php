@@ -321,26 +321,48 @@ if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
 
     // Modal Detail Logic (Sederhana)
     function det(id) {
-        curId = id; $('#detTitle').text(id); $('#detailModal').modal('show');
-        $.get(API + '?action=get_detail&id='+id, function(d) {
+        curId = id; 
+        $('#detTitle').text(decodeURIComponent(id)); 
+        $('#detailModal').modal('show');
+        
+        // Reset ke status memuat
+        $('#d_model, #d_tags, #d_sn, #d_sw, #d_uptime, #d_rx, #d_temp, #d_mode, #d_ip, #d_user_gw, #d_mac, #d_ssid_all, #d_wifi_pass').text('...');
+        $('#d_clients').text('0');
+        $('#btn_webui').addClass('disabled').attr('href', '#');
+
+        $.get(API + '?action=get_detail&id='+encodeURIComponent(id), function(d) {
+            if (!d || d.error) {
+                alert('Gagal mengambil data perangkat: ' + (d && d.error ? d.error : 'Data kosong'));
+                $('#d_model, #d_tags, #d_sn, #d_sw, #d_uptime, #d_rx, #d_temp, #d_mode, #d_ip, #d_user_gw, #d_mac, #d_ssid_all, #d_wifi_pass').text('-');
+                return;
+            }
             let vp = d.VirtualParameters || {};
             let igd = d.InternetGatewayDevice || {};
             let dev = d.Device || {};
 
-            let model = clean(igd.DeviceInfo?.ModelName) || clean(dev.DeviceInfo?.ModelName, '-');
-            $('#d_model').text(model);
+            let model = clean(vp.model, '') || d._deviceId?._ProductClass || clean(igd.DeviceInfo?.ModelName, '') || clean(dev.DeviceInfo?.ModelName, '-');
+            $('#d_model').text(model || '-');
             
-            let tags = d._tags ? d._tags.join(', ') : '-';
+            let tags = d._tags && d._tags.length > 0 ? d._tags.join(', ') : (d._local_tag || '-');
             $('#d_tags').text(tags);
 
-            $('#d_sn').text(clean(vp.getSerialNumber));
-            $('#d_sw').text(clean(igd.DeviceInfo?.SoftwareVersion));
-            $('#d_uptime').text(clean(vp.getdeviceuptime));
+            let sn = clean(vp.getSerialNumber, '') || d._deviceId?._SerialNumber || clean(igd.DeviceInfo?.SerialNumber, '') || clean(dev.DeviceInfo?.SerialNumber, '-');
+            $('#d_sn').text(sn || '-');
+            
+            let sw = clean(igd.DeviceInfo?.SoftwareVersion, '') || clean(dev.DeviceInfo?.SoftwareVersion, '-');
+            $('#d_sw').text(sw || '-');
+            
+            let uptime = clean(vp.getdeviceuptime, '') || clean(igd.DeviceInfo?.UpTime, '') || clean(dev.DeviceInfo?.UpTime, '-');
+            $('#d_uptime').text(uptime || '-');
+            
             $('#d_clients').text(clean(vp.activedevices, '0'));
             
-            let rx = clean(vp.RXPower);
-            $('#d_rx').text(rx).css('color', parseFloat(rx) < -27 ? 'red':'green');
-            $('#d_temp').text(clean(vp.gettemp)); $('#d_mode').text(clean(vp.getponmode));
+            let rx = clean(vp.RXPower, '-');
+            let rxVal = parseFloat(rx);
+            $('#d_rx').text(rx).css('color', (!isNaN(rxVal) && rxVal < -27) ? 'red':'green');
+            
+            $('#d_temp').text(clean(vp.gettemp, '-')); 
+            $('#d_mode').text(clean(vp.getponmode, '-'));
 
             // Scan lagi untuk detail
             let scan = scanAllIps(igd);
@@ -350,10 +372,12 @@ if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
             $('#d_ip').text(ip || '-');
             $('#d_user_gw').text(user);
             $('#d_pass_mask').text('******'); // Password hidden
-            $('#d_mac').text('-'); 
+            
+            let mac = clean(vp.pppoeMac, '') || clean(vp.PonMac, '') || getSafe(igd, 'LANDevice.1.LANEthernetInterfaceConfig.1.MACAddress', '-');
+            $('#d_mac').text(mac || '-'); 
 
-            if(ip) $('#btn_webui').attr('href', 'http://'+ip).removeClass('disabled');
-            else $('#btn_webui').addClass('disabled');
+            if(ip && ip !== '-') $('#btn_webui').attr('href', 'http://'+ip).removeClass('disabled');
+            else $('#btn_webui').addClass('disabled').attr('href', '#');
 
             // --- LOGIKA SSID & PASSWORD (LEBIH LENGKAP) ---
             let ssid = clean(vp.SSID, '') || clean(vp.SSID_ALL, '') || getSafe(igd, 'LANDevice.1.WLANConfiguration.1.SSID', '-');
@@ -364,6 +388,8 @@ if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
             if(!pass || pass === '-') pass = getSafe(igd, 'LANDevice.1.WLANConfiguration.1.KeyPassphrase', '');
             if(!pass || pass === '-') pass = getSafe(igd, 'LANDevice.1.WLANConfiguration.1.PreSharedKey', '');
             $('#d_wifi_pass').text(pass || '-');
+        }).fail(function(xhr) {
+            alert('Gagal menghubungi server API: ' + xhr.status + ' ' + xhr.statusText);
         });
     }
     

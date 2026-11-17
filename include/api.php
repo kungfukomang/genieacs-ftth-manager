@@ -122,6 +122,47 @@ function callGenie($endpoint, $method = 'GET', $data = null, $timeout = null) {
     return $decoded;
 }
 
+// Helper untuk mencari perangkat GenieACS dengan toleransi karakter khusus (_id dengan %2D vs '-')
+function getGenieDevice($id, $projection = null) {
+    if (!$id) return null;
+    
+    $possibleIds = [$id, rawurldecode($id)];
+    $parts = explode('-', $id);
+    if (count($parts) >= 3) {
+        $oui = array_shift($parts);
+        $sn = array_pop($parts);
+        $middle = implode('-', $parts);
+        $possibleIds[] = $oui . '-' . str_replace('-', '%2D', $middle) . '-' . $sn;
+        $possibleIds[] = $oui . '-' . str_replace('%2D', '-', $middle) . '-' . $sn;
+    }
+    $possibleIds = array_values(array_unique(array_filter($possibleIds)));
+
+    $query = ['_id' => count($possibleIds) === 1 ? $possibleIds[0] : ['$in' => $possibleIds]];
+    $endpoint = "/devices/?query=" . urlencode(json_encode($query));
+    if ($projection) {
+        $endpoint .= "&projection=" . urlencode($projection);
+    }
+    $res = callGenie($endpoint);
+    if (is_array($res) && !isset($res['error']) && count($res) > 0 && isset($res[0]['_id'])) {
+        return $res[0];
+    }
+
+    // Fallback: Jika belum ketemu, coba pencarian regex dengan OUI dan Serial Number
+    if (isset($oui) && isset($sn)) {
+        $regex = '^' . preg_quote($oui, '/') . '.*' . preg_quote($sn, '/') . '$';
+        $endpointRegex = "/devices/?query=" . urlencode(json_encode(['_id' => ['$regex' => $regex]]));
+        if ($projection) {
+            $endpointRegex .= "&projection=" . urlencode($projection);
+        }
+        $resRegex = callGenie($endpointRegex);
+        if (is_array($resRegex) && !isset($resRegex['error']) && count($resRegex) > 0 && isset($resRegex[0]['_id'])) {
+            return $resRegex[0];
+        }
+    }
+
+    return null;
+}
+
 // --- 1. ACTION: SEARCH (Pencarian Device) ---
 if ($action === 'search') {
     $k = $_GET['keyword'] ?? '';
@@ -182,17 +223,10 @@ if ($action === 'get_detail') {
     $id = $_GET['id'] ?? '';
     if (!$id) { ob_clean(); echo json_encode(['error' => 'No ID']); exit; }
     
-    // REVISI: Gunakan Search by ID (lebih aman dari error 405/404 akibat karakter ID)
-    $query = json_encode(['_id' => $id]);
-    $endpoint = "/devices/?query=" . urlencode($query);
-    $res = callGenie($endpoint);
+    $dev = getGenieDevice($id);
 
     // Ambil item pertama dari hasil pencarian
-    if (isset($res['error'])) {
-        ob_clean();
-        echo json_encode($res);
-    } elseif (is_array($res) && count($res) > 0) {
-        $dev = $res[0];
+    if ($dev) {
         // Inject Tag Lokal
         $localTags = getLocalTags();
         if (isset($localTags[$dev['_id']])) {
@@ -217,6 +251,7 @@ if ($action === 'add_tag' && $method === 'POST') {
     $tag = trim($_POST['tag'] ?? '');
     
     // Jika SN ada, cari ID asli dari database GenieACS (Override ID dari frontend)
+    $realId = '';
     if ($sn) {
         $query = [
             '$or' => [
@@ -228,15 +263,20 @@ if ($action === 'add_tag' && $method === 'POST') {
         $searchUrl = "/devices/?query=" . urlencode(json_encode($query)) . "&projection=_id";
         $searchRes = callGenie($searchUrl);
         if (is_array($searchRes) && count($searchRes) > 0 && isset($searchRes[0]['_id'])) {
-            $id = $searchRes[0]['_id'];
+            $realId = $searchRes[0]['_id'];
         }
     }
+    if (!$realId && $id) {
+        $found = getGenieDevice($id, '_id');
+        if ($found) $realId = $found['_id'];
+    }
+    if (!$realId) $realId = $id;
 
-    if ($id) {
+    if ($realId) {
         // SIMPAN KE JSON LOKAL (Bypass GenieACS API)
-        saveLocalTag($id, $tag);
+        saveLocalTag($realId, $tag);
         ob_clean();
-        echo json_encode(['status' => 'success', 'message' => 'Tag saved locally']);
+        echo json_encode(['status' => 'success', 'message' => 'Tag saved locally', 'id' => $realId]);
     } else {
         ob_clean();
         echo json_encode(['status' => 'error', 'message' => 'ID or Tag missing']);
@@ -248,11 +288,13 @@ if ($action === 'add_tag' && $method === 'POST') {
 if ($action === 'reboot' && $method === 'POST') {
     $id = $_POST['device_id'] ?? '';
     if ($id) {
-        $endpoint = "/devices/" . rawurlencode($id) . "/tasks?timeout=3000&connection_request";
+        $found = getGenieDevice($id, '_id');
+        $realId = $found ? $found['_id'] : $id;
+        $endpoint = "/devices/" . rawurlencode($realId) . "/tasks?timeout=3000&connection_request";
         $res = callGenie($endpoint, 'POST', ['name' => 'reboot']);
         
         // Kirim Notif Telegram
-        sendTelegram(TELEGRAM_ADMIN_ID, "⚠️ *DEVICE REBOOT*\n\n🆔 ID: `$id`\n🕒 Waktu: " . date('Y-m-d H:i:s'));
+        sendTelegram(TELEGRAM_ADMIN_ID, "⚠️ *DEVICE REBOOT*\n\n🆔 ID: `$realId`\n🕒 Waktu: " . date('Y-m-d H:i:s'));
         
         ob_clean();
         echo json_encode($res);
@@ -267,15 +309,23 @@ if ($action === 'update_wifi' && $method === 'POST') {
     $pass = $_POST['pass'] ?? $_POST['password'] ?? null;
 
     if (!$id) {
+        ob_clean();
         echo json_encode(['status' => 'error', 'message' => 'Device ID missing']);
         exit;
     }
 
+    $dev = getGenieDevice($id);
+    if (!$dev) {
+        ob_clean();
+        echo json_encode(['status' => 'error', 'message' => 'Device Not Found']);
+        exit;
+    }
+    $realId = $dev['_id'];
+
     $params = [];
     // 1. Deteksi Root Path (IGD atau Device)
     $root = "InternetGatewayDevice";
-    $checkRoot = callGenie("/devices/?query=" . urlencode(json_encode(['_id' => $id])) . "&projection=Device");
-    if (is_array($checkRoot) && count($checkRoot) > 0 && isset($checkRoot[0]['Device'])) {
+    if (isset($dev['Device'])) {
         $root = "Device";
     }
 
@@ -283,17 +333,13 @@ if ($action === 'update_wifi' && $method === 'POST') {
         if ($ssid !== null) $params[] = ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', (string)$ssid, 'xsd:string'];
         if ($pass !== null) {
             // Deteksi parameter password yang tepat (KeyPassphrase vs PreSharedKey)
-            $qUrl = "/devices/?query=" . urlencode(json_encode(['_id' => $id])) . "&projection=InternetGatewayDevice.LANDevice.1.WLANConfiguration.1";
-            $devData = callGenie($qUrl);
+            $wlan = $dev['InternetGatewayDevice']['LANDevice'][1]['WLANConfiguration'][1] ?? [];
             $passParam = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey'; // Default
             
-            if (is_array($devData) && !isset($devData['error']) && count($devData) > 0) {
-                $wlan = $devData[0]['InternetGatewayDevice']['LANDevice'][1]['WLANConfiguration'][1] ?? [];
-                if (isset($wlan['KeyPassphrase'])) {
-                    $passParam = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase';
-                } elseif (isset($wlan['PreSharedKey']) && is_array($wlan['PreSharedKey']) && isset($wlan['PreSharedKey']['1'])) {
-                    $passParam = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey';
-                }
+            if (isset($wlan['KeyPassphrase'])) {
+                $passParam = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase';
+            } elseif (isset($wlan['PreSharedKey']) && is_array($wlan['PreSharedKey']) && isset($wlan['PreSharedKey']['1'])) {
+                $passParam = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey';
             }
             $params[] = [$passParam, (string)$pass, 'xsd:string'];
         }
@@ -304,12 +350,13 @@ if ($action === 'update_wifi' && $method === 'POST') {
     }
 
     if (empty($params)) {
+        ob_clean();
         echo json_encode(['status' => 'error', 'message' => 'No parameters to update']);
         exit;
     }
 
     // Kirim tugas ke GenieACS dengan connection_request agar langsung dieksekusi
-    $endpoint = "/devices/" . rawurlencode($id) . "/tasks?connection_request";
+    $endpoint = "/devices/" . rawurlencode($realId) . "/tasks?connection_request";
     $res = callGenie($endpoint, 'POST', ['name' => 'setParameterValues', 'parameterValues' => $params]);
 
     if (isset($res['error'])) {
