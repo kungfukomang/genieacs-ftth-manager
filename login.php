@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </form>
     </div>
     <div class="card-footer text-center bg-light small text-muted py-3">
-        &copy; <?php echo date('Y'); ?> Network Management System By: ITMAGELANG
+        &copy; <?php echo date('Y'); ?> GenieACS Manager & FTTH Network System
     </div>
 </div>
 
