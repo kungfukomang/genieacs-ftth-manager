@@ -43,3 +43,4 @@ define('TELEGRAM_ENABLED', filter_var(get_conf('telegram_enabled', false), FILTE
 define('TELEGRAM_BOT_TOKEN', get_conf('telegram_token', '')); 
 define('TELEGRAM_ADMIN_ID', get_conf('telegram_admin_id', '')); 
 ?>
+

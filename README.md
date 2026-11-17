@@ -88,16 +88,42 @@ genieacs-manager/
 
 ---
 
-## 🚀 Panduan Instalasi
+## 🚀 Panduan Instalasi & Deployment
 
-### Prasyarat Sistem
-- **PHP:** Versi 7.4, 8.0, 8.1, atau 8.2 (dengan ekstensi: `curl`, `json`, `session`).
-- **Web Server:** Nginx (Sangat Direkomendasikan di Linux) atau Apache / XAMPP.
-- **GenieACS:** Versi 1.2.x yang sudah berjalan (port default NBI: `7557`).
+Pilih metode instalasi yang paling sesuai dengan kebutuhan infrastruktur Anda:
+
+### 🌟 Opsi 1: Docker Compose All-in-One (Paling Praktis & Cepat)
+Menjalankan seluruh ekosistem: **MongoDB + GenieACS CWMP/NBI/FS/UI + Dashboard FTTH Manager** hanya dengan 1 perintah!
+
+1. Clone repositori:
+   ```bash
+   git clone https://github.com/username/genieacs-manager.git
+   cd genieacs-manager
+   ```
+2. Jalankan Docker Compose:
+   ```bash
+   docker compose up -d
+   ```
+3. Akses layanan:
+   - **GenieACS CWMP (TR-069):** `http://IP-SERVER:7547`
+   - **GenieACS Admin UI:** `http://IP-SERVER:3000`
+   - **Dashboard FTTH Manager:** `http://IP-SERVER:8080/` *(Login: admin / admin123)*
 
 ---
 
-### A. Instalasi di Ubuntu / Debian (Nginx + PHP-FPM)
+### ⚡ Opsi 2: Skrip Otomatis Linux Installer (Ubuntu / Debian Native)
+Skrip `install.sh` akan secara otomatis memasang Node.js 20 LTS, MongoDB, GenieACS 1.2.16, Systemd Services, Nginx, PHP 8.1, serta menginjeksi Provision Inform (ekstraksi SSID, PPPoE IP, Rx Power dBm, dan Summon Fix).
+
+```bash
+git clone https://github.com/username/genieacs-manager.git
+cd genieacs-manager
+sudo bash install.sh
+```
+*Tunggu hingga skrip selesai (sekitar 2-3 menit), dan server Anda langsung 100% aktif dan siap digunakan!*
+
+---
+
+### 🛠️ Opsi 3: Instalasi Manual di Ubuntu / Debian (Nginx + PHP-FPM)
 
 1. **Clone Repositori:**
    ```bash
@@ -172,3 +198,4 @@ Dashboard ini telah dilengkapi dengan standar keamanan berlapis:
 
 ## 📄 Lisensi
 Proyek ini dilisensikan di bawah lisensi [MIT License](LICENSE) — bebas digunakan, dimodifikasi, dan didistribusikan untuk keperluan pribadi maupun komersial.
+

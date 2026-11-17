@@ -1,0 +1,13 @@
+[Unit]
+Description=GenieACS CWMP (TR-069 Service)
+After=network.target mongod.service
+
+[Service]
+User=genieacs
+EnvironmentFile=/opt/genieacs/genieacs.env
+ExecStart=/usr/local/bin/genieacs-cwmp
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

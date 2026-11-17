@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # 1. MongoDB Database for GenieACS
+  mongo:
+    image: mongo:4.4
+    container_name: genieacs-mongo
+    restart: always
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "127.0.0.1:27017:27017"
+    networks:
+      - genieacs-net
+
+  # 2. GenieACS CWMP (TR-069 Service - Port 7547)
+  genieacs-cwmp:
+    image: drumsergio/genieacs:latest
+    container_name: genieacs-cwmp
+    restart: always
+    environment:
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://mongo:27017/genieacs
+      - GENIEACS_CWMP_PORT=7547
+    ports:
+      - "7547:7547"
+    depends_on:
+      - mongo
+    command: genieacs-cwmp
+    networks:
+      - genieacs-net
+
+  # 3. GenieACS NBI (Northbound Interface API - Port 7557)
+  genieacs-nbi:
+    image: drumsergio/genieacs:latest
+    container_name: genieacs-nbi
+    restart: always
+    environment:
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://mongo:27017/genieacs
+      - GENIEACS_NBI_PORT=7557
+    ports:
+      - "127.0.0.1:7557:7557"
+    depends_on:
+      - mongo
+    command: genieacs-nbi
+    networks:
+      - genieacs-net
+
+  # 4. GenieACS FS (File Server for Firmware/Config - Port 7567)
+  genieacs-fs:
+    image: drumsergio/genieacs:latest
+    container_name: genieacs-fs
+    restart: always
+    environment:
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://mongo:27017/genieacs
+      - GENIEACS_FS_PORT=7567
+    ports:
+      - "7567:7567"
+    depends_on:
+      - mongo
+    command: genieacs-fs
+    networks:
+      - genieacs-net
+
+  # 5. GenieACS Official UI (Port 3000)
+  genieacs-ui:
+    image: drumsergio/genieacs:latest
+    container_name: genieacs-ui
+    restart: always
+    environment:
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://mongo:27017/genieacs
+      - GENIEACS_UI_PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    command: genieacs-ui
+    networks:
+      - genieacs-net
+
+  # 6. GenieACS Manager Web Dashboard & FTTH GIS Topology (Port 8080)
+  genieacs-dashboard:
+    image: richarvey/nginx-php-fpm:latest
+    container_name: genieacs-dashboard
+    restart: always
+    volumes:
+      - ./:/var/www/html
+    environment:
+      - WEBROOT=/var/www/html
+      - RUN_CLI=1
+    ports:
+      - "8080:80"
+    depends_on:
+      - genieacs-nbi
+    networks:
+      - genieacs-net
+
+networks:
+  genieacs-net:
+    driver: bridge
+
+volumes:
+  mongo-data:
