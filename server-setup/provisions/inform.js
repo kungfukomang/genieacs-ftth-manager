@@ -24,3 +24,4 @@ declare('Device.Optical.Interface.*.OpticalSignalLevel', {value: now});
 // 5. Fetch Device Uptime & Status
 declare('InternetGatewayDevice.DeviceInfo.UpTime', {value: now});
 declare('Device.DeviceInfo.UpTime', {value: now});
+
