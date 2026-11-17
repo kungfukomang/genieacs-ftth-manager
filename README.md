@@ -8,6 +8,12 @@
 **GenieACS Manager & FTTH Network GIS** adalah dashboard berbasis web yang komprehensif, modern, dan ringan untuk memonitor perangkat CPE/ONT melalui **GenieACS (TR-069)** sekaligus mengelola topologi jaringan kabel optik **FTTH (Fiber to the Home)** secara visual di atas peta interaktif.
 
 ---
+<img width="1677" height="429" alt="Screenshot_4" src="https://github.com/user-attachments/assets/485cc5fe-25df-44a7-a863-d378051644c6" />
+<img width="1677" height="839" alt="Screenshot_3" src="https://github.com/user-attachments/assets/32172c7d-79e7-4837-835c-f09cc899b142" />
+<img width="1159" height="477" alt="Screenshot_2" src="https://github.com/user-attachments/assets/3a53299e-a5ad-4a2b-9c4e-41e2aabfad1f" />
+<img width="1666" height="561" alt="Screenshot_1" src="https://github.com/user-attachments/assets/ab3c710b-cd2e-48d6-b902-56e1cdb6b002" />
+<img width="1683" height="834" alt="Screenshot_5" src="https://github.com/user-attachments/assets/d2577ba2-9e8d-4ce1-9124-4be744867487" />
+
 
 ## ✨ Fitur Utama
 
