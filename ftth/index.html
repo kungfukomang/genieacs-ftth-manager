@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database FTTH</title>
+
+    <!-- Library Peta Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Library untuk menggambar di Peta (Leaflet.draw) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <style>
+        body { font-family: sans-serif; margin: 0; }
+        #map { height: 100vh; }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-width: 250px;
+        }
+        .info-panel h3 { margin-top: 0; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        button:hover { background-color: #45a049; }
+        #status {
+            margin-top: 15px;
+            font-style: italic;
+            color: #555;
+        }
+        .popup-buttons button {
+            width: auto;
+            padding: 5px 10px;
+            font-size: 12px;
+            margin: 5px 5px 0 0;
+        }
+        .popup-buttons button.delete {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="info-panel">
+        <h3>Database Jaringan FTTH</h3>
+        <p>Gunakan toolbar di kiri untuk menambah/mengedit/menghapus item. Klik marker/garis untuk melihat detail.</p>
+        <button id="saveButton">Simpan Semua Perubahan</button>
+        <div id="status">Data termuat.</div>
+    </div>
+
+    <script>
+        // --- URL API ---
+        const API_BASE_URL = '../include/api.php';
+
+        // --- Inisialisasi Peta ---
+        // Koordinat awal (ambil dari config.php atau set manual)
+        const initialCoords = [-7.59052, 110.21928];
+        const map = L.map('map').setView(initialCoords, 15);
+
+        // Tambahkan layer peta (misal: OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // --- Variabel untuk menyimpan data ---
+        let ftthData = []; // Untuk ODP, ODC, OTB
+        let routeData = []; // Untuk Rute Kabel
+        const featureGroup = L.featureGroup().addTo(map); // Grup untuk menampung semua object
+
+        // --- Fungsi untuk menampilkan status ---
+        const statusEl = document.getElementById('status');
+        function showStatus(message, isError = false) {
+            statusEl.textContent = message;
+            statusEl.style.color = isError ? 'red' : '#555';
+        }
+
+        // --- Fungsi untuk membuat ID unik ---
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // --- Fungsi untuk memuat data dari server ---
+        async function loadData() {
+            showStatus('Memuat data jaringan...');
+            try {
+                // 1. Ambil data FTTH (Tiang, ODP, dll)
+                const ftthResponse = await fetch(`${API_BASE_URL}?action=get_ftth_data`);
+                ftthData = await ftthResponse.json();
+                if (!Array.isArray(ftthData)) ftthData = [];
+
+                ftthData.forEach((item, index) => {
+                    if (!item.id) item.id = generateId(); // Kompatibilitas data lama
+                    const marker = L.marker([item.lat, item.lng]).addTo(featureGroup);
+                    marker.featureId = item.id; // Tautkan layer ke ID data
+                    bindPopupContent(marker, item);
+                });
+
+                // 2. Ambil data Rute
+                const routeResponse = await fetch(`${API_BASE_URL}?action=get_route_data`);
+                routeData = await routeResponse.json();
+                if (!Array.isArray(routeData)) routeData = [];
+
+                routeData.forEach((item, index) => {
+                    if (!item.id) item.id = generateId(); // Kompatibilitas data lama
+                    const polyline = L.polyline(item.latlngs).addTo(featureGroup);
+                    polyline.featureId = item.id; // Tautkan layer ke ID data
+                    bindPopupContent(polyline, item);
+                });
+
+                showStatus('Semua data berhasil dimuat.');
+
+            } catch (error) {
+                console.error('Gagal memuat data:', error);
+                showStatus('Error: Gagal memuat data dari server.', true);
+            }
+        }
+
+        // --- Fungsi untuk membuat konten popup ---
+        function bindPopupContent(layer, item) {
+            let content = '';
+            if (item.type === 'route') {
+                content = `<b>Rute Kabel</b><br>Nama: ${item.name}`;
+            } else {
+                content = `<b>${item.type.toUpperCase()}</b><br>
+                           Nama: ${item.name}<br>
+                           Device: ${item.deviceIdentifier || '<i>Belum terhubung</i>'}`;
+            }
+            layer.bindPopup(content);
+        }
+
+        // --- Fungsi untuk mencari item di array data berdasarkan ID ---
+        function findItemById(id) {
+            let item = ftthData.find(d => d.id === id);
+            let collection = ftthData;
+            let type = 'ftth';
+
+            if (!item) {
+                item = routeData.find(d => d.id === id);
+                collection = routeData;
+                type = 'route';
+            }
+            return { item, collection, type };
+        }
+
+        // --- Fungsi untuk menyimpan data ke server ---
+        async function saveData() {
+            showStatus('Menyimpan perubahan...');
+            try {
+                // 1. Simpan data FTTH
+                const ftthSave = fetch(`${API_BASE_URL}?action=save_ftth_data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ftthData)
+                });
+
+                // 2. Simpan data Rute
+                const routeSave = fetch(`${API_BASE_URL}?action=save_route_data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(routeData)
+                });
+
+                // Tunggu kedua proses selesai
+                const [ftthResult, routeResult] = await Promise.all([ftthSave, routeSave]);
+
+                if (ftthResult.ok && routeResult.ok) {
+                    showStatus('Semua perubahan berhasil disimpan!');
+                    setTimeout(() => showStatus('Data termuat.'), 3000);
+                } else {
+                    throw new Error('Salah satu proses penyimpanan gagal.');
+                }
+
+            } catch (error) {
+                console.error('Gagal menyimpan data:', error);
+                showStatus('Error: Gagal menyimpan data ke server.', true);
+            }
+        }
+
+
+        // --- Inisialisasi Fitur Gambar (Leaflet.draw) ---
+        const drawControl = new L.Control.Draw({
+            edit: {
+                featureGroup: featureGroup, // Izinkan edit & hapus object yang ada
+                remove: true
+            },
+            draw: {
+                polygon: false, // Nonaktifkan gambar poligon
+                rectangle: false, // Nonaktifkan gambar kotak
+                circle: false, // Nonaktifkan gambar lingkaran
+                circlemarker: false, // Nonaktifkan gambar marker lingkaran
+                marker: {
+                    icon: new L.Icon.Default()
+                },
+                polyline: {
+                    shapeOptions: {
+                        color: '#f357a1',
+                        weight: 4
+                    }
+                }
+            }
+        });
+        map.addControl(drawControl);
+
+        // --- Event Handler saat object baru dibuat ---
+        map.on(L.Draw.Event.CREATED, function (event) {
+            const layer = event.layer;
+            const type = event.layerType;
+
+            if (type === 'marker') {
+                const itemType = prompt("Masukkan tipe (misal: ODP, ODC, OTB):", "ODP");
+                if (!itemType) return;
+
+                const itemName = prompt(`Masukkan nama untuk ${itemType.toUpperCase()}:`, `${itemType.toUpperCase()}-Baru`);
+                if (!itemName) return;
+
+                const deviceIdentifier = prompt(`(Opsional) Masukkan Device Identifier (Username PPPoE / SN):`);
+
+                const newItem = {
+                    id: generateId(),
+                    type: itemType.toUpperCase(),
+                    name: itemName,
+                    lat: layer.getLatLng().lat,
+                    lng: layer.getLatLng().lng,
+                    deviceIdentifier: deviceIdentifier || null
+                };
+
+                ftthData.push(newItem);
+                layer.featureId = newItem.id;
+                bindPopupContent(layer, newItem);
+                showStatus('Marker baru ditambahkan. Klik "Simpan".');
+
+            } else if (type === 'polyline') {
+                const itemName = prompt("Masukkan nama/keterangan untuk rute ini:", "Rute Utama");
+                if (!itemName) return;
+
+                const newItem = {
+                    id: generateId(),
+                    type: 'route',
+                    name: itemName,
+                    latlngs: layer.getLatLngs().map(latlng => [latlng.lat, latlng.lng])
+                };
+                routeData.push(newItem);
+                layer.featureId = newItem.id;
+                bindPopupContent(layer, newItem);
+                showStatus('Rute baru ditambahkan. Klik "Simpan".');
+            }
+
+            // Tambahkan layer baru ke grup
+            featureGroup.addLayer(layer);
+        });
+
+        // --- Event Handler saat object diedit (posisi digeser) ---
+        map.on(L.Draw.Event.EDITED, function (event) {
+            event.layers.eachLayer(function (layer) {
+                const { item } = findItemById(layer.featureId);
+                if (!item) return;
+
+                if (item.type === 'route') {
+                    item.latlngs = layer.getLatLngs().map(latlng => [latlng.lat, latlng.lng]);
+                } else {
+                    const latlng = layer.getLatLng();
+                    item.lat = latlng.lat;
+                    item.lng = latlng.lng;
+                }
+                showStatus('Posisi diubah. Klik "Simpan".');
+            });
+        });
+
+        // --- Event Handler saat object dihapus ---
+        map.on(L.Draw.Event.DELETED, function (event) {
+            event.layers.eachLayer(function (layer) {
+                const { item, collection } = findItemById(layer.featureId);
+                if (!item) return;
+
+                const itemIndex = collection.findIndex(d => d.id === item.id);
+                if (itemIndex > -1) {
+                    collection.splice(itemIndex, 1);
+                }
+            });
+            showStatus('Item dihapus. Klik "Simpan".');
+        });
+
+        // --- Event handler untuk mengedit properti item saat popup dibuka ---
+        featureGroup.on('popupopen', function(e) {
+            const layer = e.layer;
+            const { item } = findItemById(layer.featureId);
+            if (!item) return;
+
+            // Fungsi edit yang akan dipanggil dari popup
+            window.editItem = function(id) {
+                const { item: currentItem } = findItemById(id);
+                if (!currentItem) return;
+
+                const newName = prompt("Masukkan nama baru:", currentItem.name);
+                if (newName) currentItem.name = newName;
+
+                if (currentItem.type !== 'route') {
+                    const newDevice = prompt("(Opsional) Masukkan Device Identifier (Username/SN):", currentItem.deviceIdentifier || "");
+                    currentItem.deviceIdentifier = newDevice || null;
+                }
+
+                bindPopupContent(layer, currentItem); // Update popup content
+                showStatus('Properti diubah. Klik "Simpan".');
+            }
+
+            layer.getPopup().setContent(`${layer.getPopup().getContent()}<div class="popup-buttons"><button onclick="editItem('${item.id}')">Edit Properti</button></div>`);
+        });
+
+        // --- Event handler untuk tombol simpan ---
+        document.getElementById('saveButton').addEventListener('click', saveData);
+
+        // --- Muat data saat halaman pertama kali dibuka ---
+        document.addEventListener('DOMContentLoaded', loadData);
+
+    </script>
+
+</body>
+</html>

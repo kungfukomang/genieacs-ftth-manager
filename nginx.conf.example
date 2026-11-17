@@ -1,0 +1,46 @@
+# Nginx Configuration Example for GenieACS Manager & FTTH Dashboard
+# Place in /etc/nginx/sites-available/genieacs-manager and symlink to /etc/nginx/sites-enabled/
+
+server {
+    listen 80;
+    server_name your-domain.com; # Replace with your domain or IP
+
+    root /var/www/genieacs-manager;
+    index index.php index.html;
+
+    # 1. SECURITY: Block direct access to database folder (protects json files and credentials)
+    location ^~ /data/ {
+        deny all;
+        return 403;
+    }
+
+    # 2. SECURITY: Block sensitive files, archives, and dotfiles
+    location ~* \.(zip|rar|7z|bak|sql|tar|gz|txt|log|env)$ {
+        deny all;
+        return 403;
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+
+    # 3. Router
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # 4. PHP-FPM FastCGI
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock; # Adjust PHP version if needed
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # 5. GZIP Compression (Crucial for high-speed FTTH map loading)
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
+}

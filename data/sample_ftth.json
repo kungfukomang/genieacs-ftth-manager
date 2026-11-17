@@ -1,0 +1,51 @@
+[
+  {
+    "type": "OTB",
+    "name": "OTB-CENTRAL",
+    "lat": -6.175392,
+    "lng": 106.827153,
+    "details": {
+      "port_count": 96,
+      "port_connections": {
+        "1": "ODC-01"
+      }
+    }
+  },
+  {
+    "type": "ODC",
+    "name": "ODC-01",
+    "lat": -6.178500,
+    "lng": 106.831000,
+    "details": {
+      "port_count": 24,
+      "parent_otb": "OTB-CENTRAL",
+      "parent_port": "1",
+      "port_connections": {
+        "1": "ODP-01"
+      }
+    }
+  },
+  {
+    "type": "ODP",
+    "name": "ODP-01",
+    "lat": -6.182000,
+    "lng": 106.834000,
+    "details": {
+      "port_count": 8,
+      "parent_odc": "ODC-01",
+      "parent_port": "1",
+      "port_connections": []
+    }
+  },
+  {
+    "type": "PELANGGAN",
+    "name": "Customer Demo 01",
+    "lat": -6.183500,
+    "lng": 106.835500,
+    "details": {
+      "sn_ont": "ZTEGC1234567",
+      "parent_odp": "ODP-01",
+      "parent_port": "1"
+    }
+  }
+]

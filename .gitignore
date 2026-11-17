@@ -1,0 +1,31 @@
+# Configuration & runtime data
+data/settings.json
+data/telegram_offset.txt
+
+# Keep empty structure and example files
+!data/.htaccess
+!data/settings.json.example
+!data/sample_ftth.json
+!data/ftth.json
+!data/route.json
+!data/tags.json
+
+# Temporary files and sessions
+/tmp/
+*.tmp
+*.log
+sess_*
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backups and archives
+*.bak
+*.swp
+*.zip
+*.rar
+*.tar.gz
+*.7z
+*~

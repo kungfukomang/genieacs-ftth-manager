@@ -1,0 +1,15 @@
+{
+    "_comment": "Rename or copy this file to settings.json and configure your parameters",
+    "genie_host": "127.0.0.1",
+    "genie_port": "7557",
+    "genie_user": "admin",
+    "genie_pass": "your_nbi_password",
+    "dash_user": "admin",
+    "dash_pass": "your_dashboard_password",
+    "server_lat": "-6.2088",
+    "server_lng": "106.8456",
+    "map_zoom": "13",
+    "telegram_enabled": false,
+    "telegram_token": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
+    "telegram_admin_id": "123456789"
+}
