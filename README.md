@@ -103,7 +103,7 @@ Menjalankan seluruh ekosistem: **MongoDB + GenieACS CWMP/NBI/FS/UI + Dashboard F
 
 1. Clone repositori:
    ```bash
-   git clone https://github.com/username/genieacs-manager.git
+   git clone https://github.com/kungfukomang/genieacs-ftth-manager.git genieacs-manager
    cd genieacs-manager
    ```
 2. Jalankan Docker Compose:
@@ -121,7 +121,7 @@ Menjalankan seluruh ekosistem: **MongoDB + GenieACS CWMP/NBI/FS/UI + Dashboard F
 Skrip `install.sh` akan secara otomatis memasang Node.js 20 LTS, MongoDB, GenieACS 1.2.16, Systemd Services, Nginx, PHP 8.1, serta menginjeksi Provision Inform (ekstraksi SSID, PPPoE IP, Rx Power dBm, dan Summon Fix).
 
 ```bash
-git clone https://github.com/username/genieacs-manager.git
+git clone https://github.com/kungfukomang/genieacs-ftth-manager.git genieacs-manager
 cd genieacs-manager
 sudo bash install.sh
 ```
@@ -134,7 +134,7 @@ sudo bash install.sh
 1. **Clone Repositori:**
    ```bash
    cd /var/www
-   git clone https://github.com/username/genieacs-manager.git
+   git clone https://github.com/kungfukomang/genieacs-ftth-manager.git genieacs-manager
    cd genieacs-manager
    ```
 
